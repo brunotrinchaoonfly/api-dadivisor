@@ -65,8 +65,7 @@ class AnalyzeController extends Controller
         //     $priceData = $validated['historical_data'];
         //     $validated['data_source'] = 'history';
         // } else {
-            $token = $request->bearerToken() ?? config('services.onfly.token_dev', '');
-        $priceData = $this->fetchQuotes($token, $validated);
+            $priceData = $this->fetchQuotes($request->bearerToken(), $validated);
             $validated['data_source'] = 'quote';
         // }
         $result = $this->claude->analyze($validated, $priceData);
@@ -97,7 +96,7 @@ class AnalyzeController extends Controller
      * Suporta todas as modalidades: aereo, hotel, onibus, carro.
      * Cache de 15 min — preços mudam pouco nessa janela.
      */
-    private function fetchQuotes(?string $token, array $params): array
+    private function fetchQuotes(string $token, array $params): array
     {
 
 
