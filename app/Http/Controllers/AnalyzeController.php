@@ -75,7 +75,10 @@ class AnalyzeController extends Controller
             (int) $validated['flexibility_to']
         );
 
-        Cache::put($cacheKey, $result, now()->addMinutes(30));
+        // Só cacheia se obtivemos cotações reais — fallback não deve ser cacheado
+        if (! empty($priceData)) {
+            Cache::put($cacheKey, $result, now()->addMinutes(30));
+        }
 
         return response()->json($result);
     }

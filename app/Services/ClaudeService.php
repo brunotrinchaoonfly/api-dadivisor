@@ -48,7 +48,8 @@ class ClaudeService
             ])
             ->timeout(30)
             ->post($this->apiUrl, [
-                'messages' => [
+                'max_tokens' => 1024,
+                'messages'   => [
                     ['role' => 'system', 'content' => $this->systemPrompt()],
                     ['role' => 'user',   'content' => $this->buildPrompt($params, $priceData)],
                 ],
@@ -94,7 +95,9 @@ class ClaudeService
     {
         return 'Você é um assistente de viagens corporativas da Onfly. '
             . 'Analise os dados de preços e retorne as melhores combinações de datas. '
-            . 'Responda APENAS com JSON válido e puro — sem markdown, sem texto antes ou depois, sem backticks.';
+            . 'Responda APENAS com um objeto JSON válido — NÃO use array na raiz (não comece com [). '
+            . 'Sem markdown, sem texto antes ou depois, sem backticks. '
+            . 'O JSON deve começar com { e terminar com }.';
     }
 
     private function buildPrompt(array $params, array $priceData): string
@@ -167,7 +170,25 @@ PROMPT;
         $decoded  = json_decode(trim($cleaned ?? ''), true);
         if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
             Log::debug('ClaudeService: JSON extraído após remover markdown');
+            if (array_key_exists(0, $decoded) && is_array($decoded[0])) {
+                return $decoded[0];
+            }
             return $decoded;
+        }
+
+        // Tentativa 4: Llama às vezes esquece o } antes do ] final
+        // Padrão inválido: [{"suggestions":[...],"insight":"..."]  (falta })
+        $repaired = rtrim($text);
+        if (str_ends_with($repaired, ']')) {
+            $candidate = substr($repaired, 0, -1) . '}]';
+            $decoded   = json_decode($candidate, true);
+            if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+                Log::debug('ClaudeService: JSON reparado (} faltando antes de ])');
+                if (array_key_exists(0, $decoded) && is_array($decoded[0])) {
+                    return $decoded[0];
+                }
+                return $decoded;
+            }
         }
 
         return null;
